@@ -489,20 +489,20 @@ function showDetail(idx) {
 
   // Co-tenants
   if (c.ct && c.ct.length > 0) {
-    var ct = c.ct.map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>').join(', ');
+    var ct = c.ct.map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '" data-bid="' + escAttr(p.bid||'') + '">' + esc(n) + '</span>').join(', ');
     h += row('Co-tenants (' + c.ct.length + ')', ct);
   }
 
   // Building tenants
   if (c.bt && c.bt.length > 0) {
-    var bt = c.bt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>');
+    var bt = c.bt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '" data-bid="' + escAttr(p.bid||'') + '">' + esc(n) + '</span>');
     if (c.bt.length > 10) bt.push('...' + (c.bt.length - 10) + ' more');
     h += row('Building tenants (' + c.bt.length + ')', bt.join(', '));
   }
 
   // Mall tenants
   if (c.mt && c.mt.length > 0) {
-    var mt = c.mt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>');
+    var mt = c.mt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '" data-bid="' + escAttr(p.bid||'') + '">' + esc(n) + '</span>');
     if (c.mt.length > 10) mt.push('...' + (c.mt.length - 10) + ' more');
     h += row('Mall tenants (' + c.mt.length + ')', mt.join(', '));
   }
@@ -519,21 +519,35 @@ function row(label, value) {
     ':</span> <span class="detail-value">' + value + '</span></div>';
 }
 
-function findAndSelect(name) {
+function findAndSelect(name, sourceBuildingId) {
   var nameLower = name.toLowerCase();
+  var candidates = [];
   for (var i = 0; i < POIS.length; i++) {
     if (POIS[i].n.toLowerCase() === nameLower) {
-      searchInput.value = name;
-      searchInput.dispatchEvent(new Event('input'));
-      setTimeout(function() { selectPoi(i); }, 100);
-      return;
+      candidates.push(i);
     }
   }
+  if (candidates.length === 0) return;
+
+  // Prefer match in the same building
+  var best = candidates[0];
+  if (sourceBuildingId) {
+    for (var j = 0; j < candidates.length; j++) {
+      if (POIS[candidates[j]].bid === sourceBuildingId) {
+        best = candidates[j];
+        break;
+      }
+    }
+  }
+
+  searchInput.value = name;
+  searchInput.dispatchEvent(new Event('input'));
+  setTimeout(function() { selectPoi(best); }, 100);
 }
 
 document.getElementById('detail-panel').addEventListener('click', function(e) {
   var el = e.target.closest('.tenant-link');
-  if (el && el.dataset.tenant) findAndSelect(el.dataset.tenant);
+  if (el && el.dataset.tenant) findAndSelect(el.dataset.tenant, el.dataset.bid || '');
 });
 
 searchInput.addEventListener('keydown', function(e) {
