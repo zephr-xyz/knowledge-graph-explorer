@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html><head>
+<title>Knowledge Graph Explorer</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #0d1117; color: #c9d1d9; }
+
+  #map { position: absolute; top: 0; left: 380px; right: 0; bottom: 0; }
+
+  #sidebar {
+    position: absolute; top: 0; left: 0; width: 380px; bottom: 0;
+    background: #161b22; border-right: 1px solid #30363d;
+    display: flex; flex-direction: column; z-index: 1000;
+  }
+
+  #sidebar-header {
+    padding: 14px 16px; border-bottom: 1px solid #30363d;
+    background: #0d1117;
+  }
+  #sidebar-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 600; letter-spacing: 2px;
+    color: #58a6ff; margin-bottom: 4px;
+  }
+  #sidebar-header .subtitle {
+    font-size: 10px; color: #484f58; letter-spacing: 1px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  #stats-row {
+    display: flex; gap: 12px; margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  }
+  .stat { color: #484f58; }
+  .stat b { color: #8b949e; }
+
+  #search-box { padding: 10px 16px; border-bottom: 1px solid #30363d; }
+  #search-input {
+    width: 100%; padding: 8px 12px; border: 1px solid #30363d;
+    border-radius: 6px; font-size: 13px; outline: none;
+    background: #0d1117; color: #c9d1d9;
+    font-family: 'Inter', sans-serif;
+  }
+  #search-input:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+  #search-input::placeholder { color: #484f58; }
+
+  #results { flex: 1; overflow-y: auto; padding: 2px 0; }
+  #results::-webkit-scrollbar { width: 4px; }
+  #results::-webkit-scrollbar-track { background: #161b22; }
+  #results::-webkit-scrollbar-thumb { background: #30363d; }
+
+  .result-item {
+    padding: 8px 16px; cursor: pointer; border-bottom: 1px solid #21262d;
+    transition: background 0.15s;
+  }
+  .result-item:hover { background: #1c2128; }
+  .result-item.selected { background: #1f3a5f; border-left: 3px solid #58a6ff; }
+  .result-name { font-weight: 600; font-size: 13px; color: #c9d1d9; }
+  .result-addr { font-size: 11px; color: #484f58; margin-top: 2px; }
+  .result-type { font-size: 10px; color: #6e7681; font-family: 'JetBrains Mono', monospace; }
+
+  #detail-panel {
+    border-top: 1px solid #30363d; background: #0d1117;
+    max-height: 48%; overflow-y: auto; padding: 14px 16px;
+    display: none;
+  }
+  #detail-panel::-webkit-scrollbar { width: 4px; }
+  #detail-panel::-webkit-scrollbar-thumb { background: #30363d; }
+
+  #detail-panel h3 { font-size: 15px; margin-bottom: 8px; color: #e6edf3; }
+  .detail-row { font-size: 12px; margin: 5px 0; line-height: 1.5; }
+  .detail-label { color: #8b949e; font-weight: 500; }
+  .detail-value { color: #c9d1d9; }
+
+  .tag {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; margin: 1px 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tag-facade { background: rgba(136,87,229,0.15); color: #bc8cff; border: 1px solid rgba(136,87,229,0.3); }
+  .tag-corridor { background: rgba(218,54,51,0.15); color: #ff7b72; border: 1px solid rgba(218,54,51,0.3); }
+  .tag-centroid { background: rgba(130,80,50,0.15); color: #c08050; border: 1px solid rgba(130,80,50,0.3); }
+  .tag-office { background: rgba(88,166,255,0.15); color: #79c0ff; border: 1px solid rgba(88,166,255,0.3); }
+  .tag-storefront { background: rgba(63,185,80,0.15); color: #56d364; border: 1px solid rgba(63,185,80,0.3); }
+  .tag-mall { background: rgba(210,153,34,0.15); color: #e3b341; border: 1px solid rgba(210,153,34,0.3); }
+  .tag-osm { background: rgba(63,185,80,0.15); color: #56d364; border: 1px solid rgba(63,185,80,0.3); }
+  .tag-mismatch { background: rgba(210,153,34,0.15); color: #e3b341; border: 1px solid rgba(210,153,34,0.3); }
+
+  .tenant-link {
+    color: #58a6ff; cursor: pointer; text-decoration: underline;
+    font-size: 12px;
+  }
+  .tenant-link:hover { color: #79c0ff; }
+
+  #legend {
+    position: absolute; bottom: 16px; right: 12px; z-index: 1000;
+    background: #161b22; padding: 10px 14px; border-radius: 6px;
+    border: 1px solid #30363d; font: 11px/1.8 'Inter', sans-serif; color: #8b949e;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  .legend-circle { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: #0d1117; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+  }
+  .loading-overlay .spinner {
+    width: 32px; height: 32px; border: 3px solid #30363d;
+    border-top-color: #58a6ff; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay p { color: #8b949e; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+
+  .leaflet-container { background: #0d1117 !important; }
+</style>
+</head><body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p>LOADING KNOWLEDGE GRAPH...</p>
+</div>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>KNOWLEDGE GRAPH</h1>
+    <div class="subtitle">POI &bull; BUILDING &bull; ADDRESS &bull; ENTRANCE</div>
+    <div id="stats-row">
+      <span class="stat">POIS <b id="stat-pois">--</b></span>
+      <span class="stat">BUILDINGS <b id="stat-blds">--</b></span>
+      <span class="stat">OSM <b id="stat-osm">--</b></span>
+    </div>
+  </div>
+  <div id="search-box">
+    <input type="text" id="search-input" placeholder="Search POIs by name, address, category..." autofocus>
+  </div>
+  <div id="results"></div>
+  <div id="detail-panel"></div>
+</div>
+<div id="map"></div>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-circle" style="background:#58a6ff;opacity:0.2;width:14px;height:14px;border:1.5px solid #58a6ff"></div> Selected building</div>
+  <div class="legend-item"><div class="legend-circle" style="background:#666;opacity:0.15;width:14px;height:14px;border:1px solid #555"></div> Nearby building</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#58a6ff"></div> Street-facing edge</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#444"></div> Non-street edge</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f85149;height:4px"></div> Entrance facade</div>
+  <div class="legend-item"><div class="legend-circle" style="background:#f85149"></div> Entrance</div>
+  <div class="legend-item"><div class="legend-circle" style="background:#56d364"></div> OSM node</div>
+  <div class="legend-item"><div class="legend-circle" style="background:#bc8cff;opacity:0.5"></div> POI centroid</div>
+  <div class="legend-item"><div class="legend-circle" style="background:#e3b341"></div> Co-tenant entrance</div>
+</div>
+
+<script>
+const CDN = 'https://zephr-mapillary-cache.s3.amazonaws.com/graph-viewer';
+var map = L.map('map', { attributionControl: false }).setView([40.015, -105.27], 13);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 22
+}).addTo(map);
+
+var POIS = [], BLDS = {};
+var graphLayers = L.layerGroup().addTo(map);
+var selectedIdx = -1;
+
+fetch(CDN + '/graph_data.json')
+  .then(r => r.json())
+  .then(data => {
+    POIS = data.pois;
+    BLDS = data.blds;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('stat-pois').textContent = POIS.length.toLocaleString();
+    document.getElementById('stat-blds').textContent = Object.keys(BLDS).length.toLocaleString();
+    document.getElementById('stat-osm').textContent =
+      POIS.filter(p => p.c && p.c.osm).length.toLocaleString();
+  });
+
+var searchInput = document.getElementById('search-input');
+var resultsDiv = document.getElementById('results');
+
+searchInput.addEventListener('input', function() {
+  var q = this.value.toLowerCase().trim();
+  resultsDiv.innerHTML = '';
+  if (q.length < 2) return;
+
+  var matches = [];
+  POIS.forEach(function(p, i) {
+    if ((p.n || '').toLowerCase().indexOf(q) >= 0 ||
+        (p.a || '').toLowerCase().indexOf(q) >= 0 ||
+        (p.t || '').toLowerCase().replace(/_/g,' ').indexOf(q) >= 0) {
+      matches.push(i);
+    }
+  });
+
+  matches.sort(function(a, b) {
+    var an = POIS[a].n.toLowerCase();
+    var bn = POIS[b].n.toLowerCase();
+    var aStart = an.indexOf(q) === 0 ? 0 : 1;
+    var bStart = bn.indexOf(q) === 0 ? 0 : 1;
+    if (aStart !== bStart) return aStart - bStart;
+    return an < bn ? -1 : 1;
+  });
+
+  matches.slice(0, 50).forEach(function(idx) {
+    var p = POIS[idx];
+    var div = document.createElement('div');
+    div.className = 'result-item';
+    div.innerHTML = '<div class="result-name">' + esc(p.n) + '</div>' +
+      (p.a ? '<div class="result-addr">' + esc(p.a) + '</div>' : '') +
+      '<div class="result-type">' + esc((p.t||'').replace(/_/g,' ')) + '</div>';
+    div.onclick = function() { selectPoi(idx); };
+    resultsDiv.appendChild(div);
+  });
+});
+
+function esc(s) { if (!s) return ''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function escAttr(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function selectPoi(idx) {
+  selectedIdx = idx;
+  document.querySelectorAll('.result-item').forEach(function(el) { el.classList.remove('selected'); });
+
+  var q = searchInput.value.toLowerCase().trim();
+  var matches = [];
+  POIS.forEach(function(p, i) {
+    if ((p.n || '').toLowerCase().indexOf(q) >= 0 ||
+        (p.a || '').toLowerCase().indexOf(q) >= 0 ||
+        (p.t || '').toLowerCase().replace(/_/g,' ').indexOf(q) >= 0) {
+      matches.push(i);
+    }
+  });
+  matches.sort(function(a, b) {
+    var an = POIS[a].n.toLowerCase(), bn = POIS[b].n.toLowerCase();
+    var aS = an.indexOf(q)===0?0:1, bS = bn.indexOf(q)===0?0:1;
+    if (aS!==bS) return aS-bS; return an<bn?-1:1;
+  });
+  var listIdx = matches.indexOf(idx);
+  var items = document.querySelectorAll('.result-item');
+  if (listIdx >= 0 && items[listIdx]) items[listIdx].classList.add('selected');
+
+  drawGraph(idx);
+  showDetail(idx);
+}
+
+function drawGraph(idx) {
+  graphLayers.clearLayers();
+  var p = POIS[idx];
+  var c = p.c || {};
+  var bld = p.bid ? BLDS[p.bid] : null;
+
+  // Nearby buildings for context
+  if (p.la && p.lo) {
+    for (var bid in BLDS) {
+      if (bid === p.bid) continue;
+      var nb = BLDS[bid];
+      if (nb.length < 3) continue;
+      var close = false;
+      for (var ni = 0; ni < nb.length; ni++) {
+        if (Math.abs(nb[ni][0] - p.la) < 0.002 && Math.abs(nb[ni][1] - p.lo) < 0.003) {
+          close = true; break;
+        }
+      }
+      if (!close) continue;
+      graphLayers.addLayer(L.polygon(nb, {
+        color: '#555', weight: 0.8, opacity: 0.3,
+        fillColor: '#666', fillOpacity: 0.08, interactive: false
+      }));
+    }
+  }
+
+  // Selected building
+  if (bld && bld.length >= 3) {
+    // Find entrance edge
+    var entEdge = -1;
+    if (p.ela && p.elo) {
+      var bestD = Infinity;
+      for (var i = 0; i < bld.length - 1; i++) {
+        var d = distToSeg(p.ela, p.elo, bld[i][0], bld[i][1], bld[i+1][0], bld[i+1][1]);
+        if (d < bestD) { bestD = d; entEdge = i; }
+      }
+    }
+
+    // Building fill
+    graphLayers.addLayer(L.polygon(bld, {
+      color: '#58a6ff', weight: 1.5, opacity: 0.5,
+      fillColor: '#58a6ff', fillOpacity: 0.15, interactive: false
+    }));
+
+    // Edges with colors
+    var roads = p.r || [];
+    var roadNames = roads.map(r => (r.n||'').toLowerCase());
+    for (var i = 0; i < bld.length - 1; i++) {
+      var isEntrance = (i === entEdge);
+      // Check if edge faces a known road (simplified — use entrance_street match)
+      var hasStreet = c.es ? true : false;
+      var color = isEntrance ? '#f85149' : (hasStreet ? '#58a6ff' : '#444');
+      var weight = isEntrance ? 5 : (hasStreet ? 2.5 : 1.2);
+      var opacity = isEntrance ? 1 : (hasStreet ? 0.7 : 0.4);
+
+      var line = L.polyline([bld[i], bld[i+1]], { color: color, weight: weight, opacity: opacity });
+      if (isEntrance) {
+        line.bindTooltip('Entrance facade' + (c.es ? ' (' + c.es + ')' : ''), {sticky:true});
+      }
+      graphLayers.addLayer(line);
+    }
+  }
+
+  // POI centroid
+  if (p.la && p.lo) {
+    graphLayers.addLayer(L.circleMarker([p.la, p.lo], {
+      radius: 6, color: '#bc8cff', fillColor: '#bc8cff', fillOpacity: 0.4, weight: 1.5
+    }).bindTooltip('POI centroid', {direction:'top'}));
+  }
+
+  // Entrance marker + approach arrow
+  if (p.ela && p.elo) {
+    graphLayers.addLayer(L.circleMarker([p.ela, p.elo], {
+      radius: 8, color: '#f85149', fillColor: '#f85149', fillOpacity: 0.9, weight: 2
+    }).bindTooltip('Entrance' + (c.fc ? ' (face ' + c.fc + ')' : ''), {direction:'top'}));
+
+    if (c.fb !== undefined) {
+      var bearing = c.fb * Math.PI / 180;
+      var arrowLen = 0.00015;
+      var endLat = p.ela + arrowLen * Math.cos(bearing);
+      var endLon = p.elo + arrowLen * Math.sin(bearing) / Math.cos(p.ela * Math.PI / 180);
+      graphLayers.addLayer(L.polyline([[p.ela, p.elo], [endLat, endLon]],
+        {color:'#f85149', weight:3, opacity:0.8}).bindTooltip('Approach: ' + c.fc, {direction:'top'}));
+      var headLen = 0.00004;
+      for (var side = -1; side <= 1; side += 2) {
+        var hb = bearing + Math.PI + side * 0.5;
+        var hLat = endLat + headLen * Math.cos(hb);
+        var hLon = endLon + headLen * Math.sin(hb) / Math.cos(p.ela * Math.PI / 180);
+        graphLayers.addLayer(L.polyline([[endLat, endLon], [hLat, hLon]],
+          {color:'#f85149', weight:2.5, opacity:0.8}));
+      }
+    }
+
+    // Dashed line from centroid to entrance
+    if (p.la && p.lo) {
+      graphLayers.addLayer(L.polyline([[p.la, p.lo], [p.ela, p.elo]],
+        {color:'#bc8cff', weight:1.5, opacity:0.3, dashArray:'4 4'}));
+    }
+  }
+
+  // Co-tenant entrances
+  if (p.cti) {
+    p.cti.forEach(function(ci) {
+      var cp = POIS[ci];
+      if (cp && cp.ela && cp.elo) {
+        graphLayers.addLayer(L.circleMarker([cp.ela, cp.elo], {
+          radius: 5, color: '#e3b341', fillColor: '#e3b341', fillOpacity: 0.6, weight: 1.5
+        }).bindTooltip(cp.n, {direction:'top'}));
+      }
+    });
+  }
+
+  // Zoom to building or entrance
+  if (bld && bld.length >= 3) {
+    var bounds = L.latLngBounds(bld);
+    if (p.la && p.lo) bounds.extend([p.la, p.lo]);
+    if (p.ela && p.elo) bounds.extend([p.ela, p.elo]);
+    map.fitBounds(bounds.pad(0.5), {maxZoom: 20});
+  } else if (p.ela) {
+    map.setView([p.ela, p.elo], 19);
+  } else if (p.la) {
+    map.setView([p.la, p.lo], 18);
+  }
+}
+
+function distToSeg(px, py, ax, ay, bx, by) {
+  var dx = bx-ax, dy = by-ay, l2 = dx*dx+dy*dy;
+  if (l2 < 1e-12) return Math.sqrt((px-ax)*(px-ax)+(py-ay)*(py-ay));
+  var t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/l2));
+  return Math.sqrt((px-ax-t*dx)*(px-ax-t*dx)+(py-ay-t*dy)*(py-ay-t*dy));
+}
+
+function showDetail(idx) {
+  var panel = document.getElementById('detail-panel');
+  panel.style.display = 'block';
+  var p = POIS[idx];
+  var c = p.c || {};
+  var h = '<h3>' + esc(p.n) + '</h3>';
+
+  // Tags
+  h += '<div style="margin:6px 0">';
+  if (c.vt === 'office') h += '<span class="tag tag-office">Office</span>';
+  if (c.vt === 'storefront') h += '<span class="tag tag-storefront">Storefront</span>';
+  if (c.mall) h += '<span class="tag tag-mall">Mall</span>';
+  if (c.et === 'facade') h += '<span class="tag tag-facade">Facade</span>';
+  if (c.et === 'corridor') h += '<span class="tag tag-corridor">Corridor</span>';
+  if (c.et === 'centroid') h += '<span class="tag tag-centroid">Centroid</span>';
+  if (c.osm) h += '<span class="tag tag-osm">OSM tier ' + c.ot + '</span>';
+  if (c.asm) h += '<span class="tag tag-mismatch">Street mismatch</span>';
+  h += '</div>';
+
+  if (p.id) h += row('GERS ID', '<code style="font-size:10px;color:#8b949e">' + esc(p.id) + '</code>');
+  if (p.a) h += row('Address', p.a);
+  if (p.t) h += row('Category', p.t.replace(/_/g, ' '));
+  if (c.es) h += row('Entrance street', c.es);
+  if (c.asm) {
+    h += row('Address street', '<span style="color:#e3b341">' + esc(c.as) +
+      '</span> &ne; <span style="color:#58a6ff">' + esc(c.es) + '</span>');
+  }
+  if (c.fc) h += row('Approach', c.fc + ' (' + c.fb + '&deg;)');
+  if (c.bs) h += row('Building source', c.bs);
+  if (p.bid) h += row('Building GERS', '<code style="font-size:10px;color:#8b949e">' + esc(p.bid) + '</code>');
+
+  // Roads
+  if (p.r && p.r.length > 0) {
+    h += row('Enclosing roads', p.r.map(r => esc(r.n || '?') + ' <span style="color:#6e7681">(' + esc(r.c) + ')</span>').join(', '));
+  }
+
+  // Co-tenants
+  if (c.ct && c.ct.length > 0) {
+    var ct = c.ct.map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>').join(', ');
+    h += row('Co-tenants (' + c.ct.length + ')', ct);
+  }
+
+  // Building tenants
+  if (c.bt && c.bt.length > 0) {
+    var bt = c.bt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>');
+    if (c.bt.length > 10) bt.push('...' + (c.bt.length - 10) + ' more');
+    h += row('Building tenants (' + c.bt.length + ')', bt.join(', '));
+  }
+
+  // Mall tenants
+  if (c.mt && c.mt.length > 0) {
+    var mt = c.mt.slice(0, 10).map(n => '<span class="tenant-link" data-tenant="' + escAttr(n) + '">' + esc(n) + '</span>');
+    if (c.mt.length > 10) mt.push('...' + (c.mt.length - 10) + ' more');
+    h += row('Mall tenants (' + c.mt.length + ')', mt.join(', '));
+  }
+
+  // Coords
+  if (p.ela && p.elo) h += row('Entrance', p.ela.toFixed(7) + ', ' + p.elo.toFixed(7));
+  if (p.la && p.lo) h += row('Centroid', p.la.toFixed(7) + ', ' + p.lo.toFixed(7));
+
+  panel.innerHTML = h;
+}
+
+function row(label, value) {
+  return '<div class="detail-row"><span class="detail-label">' + label +
+    ':</span> <span class="detail-value">' + value + '</span></div>';
+}
+
+function findAndSelect(name) {
+  var nameLower = name.toLowerCase();
+  for (var i = 0; i < POIS.length; i++) {
+    if (POIS[i].n.toLowerCase() === nameLower) {
+      searchInput.value = name;
+      searchInput.dispatchEvent(new Event('input'));
+      setTimeout(function() { selectPoi(i); }, 100);
+      return;
+    }
+  }
+}
+
+document.getElementById('detail-panel').addEventListener('click', function(e) {
+  var el = e.target.closest('.tenant-link');
+  if (el && el.dataset.tenant) findAndSelect(el.dataset.tenant);
+});
+
+searchInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    var first = resultsDiv.querySelector('.result-item');
+    if (first) first.click();
+  }
+});
+</script>
+</body></html>
