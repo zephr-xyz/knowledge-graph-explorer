@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,6 +122,38 @@
   .loading-overlay p { color: #8b949e; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
 
   .leaflet-container { background: #0d1117 !important; }
+
+  /* Cluster marker styles — dark theme */
+  .marker-cluster-small {
+    background: rgba(88,166,255,0.25) !important;
+  }
+  .marker-cluster-small div {
+    background: rgba(88,166,255,0.6) !important;
+    color: #fff !important;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .marker-cluster-medium {
+    background: rgba(136,87,229,0.25) !important;
+  }
+  .marker-cluster-medium div {
+    background: rgba(136,87,229,0.6) !important;
+    color: #fff !important;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .marker-cluster-large {
+    background: rgba(210,153,34,0.25) !important;
+  }
+  .marker-cluster-large div {
+    background: rgba(210,153,34,0.6) !important;
+    color: #fff !important;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
 </style>
 </head><body>
 
@@ -168,6 +203,8 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 var POIS = [], BLDS = {};
 var graphLayers = L.layerGroup().addTo(map);
 var selectedIdx = -1;
+var clusterGroup = null;
+var poiMarkers = [];
 
 fetch(CDN + '/graph_data.json')
   .then(r => r.json())
@@ -179,7 +216,41 @@ fetch(CDN + '/graph_data.json')
     document.getElementById('stat-blds').textContent = Object.keys(BLDS).length.toLocaleString();
     document.getElementById('stat-osm').textContent =
       POIS.filter(p => p.c && p.c.osm).length.toLocaleString();
+    initClusterMarkers();
   });
+
+function initClusterMarkers() {
+  clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    spiderfyOnMaxZoom: false,
+    disableClusteringAtZoom: 17,
+    chunkedLoading: true,
+  });
+
+  var poiIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:8px;height:8px;border-radius:50%;background:#58a6ff;border:1px solid rgba(255,255,255,0.3);"></div>',
+    iconSize: [8, 8],
+    iconAnchor: [4, 4],
+  });
+
+  POIS.forEach(function(p, idx) {
+    var lat = p.ela || p.la;
+    var lon = p.elo || p.lo;
+    if (!lat || !lon) return;
+    var m = L.marker([lat, lon], { icon: poiIcon });
+    m.on('click', function() {
+      searchInput.value = p.n;
+      searchInput.dispatchEvent(new Event('input'));
+      selectPoi(idx);
+    });
+    m.poiIdx = idx;
+    poiMarkers.push(m);
+    clusterGroup.addLayer(m);
+  });
+
+  map.addLayer(clusterGroup);
+}
 
 var searchInput = document.getElementById('search-input');
 var resultsDiv = document.getElementById('results');
