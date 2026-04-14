@@ -253,6 +253,45 @@ function initClusterMarkers() {
     clusterGroup.addLayer(m);
   });
 
+  clusterGroup.on('clusterclick', function(e) {
+    var childMarkers = e.layer.getAllChildMarkers();
+    var indices = childMarkers.map(function(m) { return m.poiIdx; }).filter(function(i) { return i !== undefined; });
+    if (indices.length === 0) return;
+
+    // Populate sidebar with cluster contents
+    searchInput.value = '';
+    resultsDiv.innerHTML = '';
+    var header = document.createElement('div');
+    header.style.cssText = 'padding:8px 16px;color:#8b949e;font-size:11px;font-family:"JetBrains Mono",monospace;border-bottom:1px solid #21262d';
+    header.textContent = indices.length + ' POIs at this location';
+    resultsDiv.appendChild(header);
+
+    indices.sort(function(a, b) {
+      var an = (POIS[a].n || '').toLowerCase();
+      var bn = (POIS[b].n || '').toLowerCase();
+      return an < bn ? -1 : an > bn ? 1 : 0;
+    });
+
+    indices.forEach(function(idx) {
+      var p = POIS[idx];
+      var div = document.createElement('div');
+      div.className = 'result-item';
+      div.innerHTML = '<div class="result-name">' + esc(p.n) + '</div>' +
+        (p.a ? '<div class="result-addr">' + esc(p.a) + '</div>' : '') +
+        '<div class="result-type">' + esc((p.t||'').replace(/_/g,' ')) + '</div>';
+      div.onclick = function() {
+        document.querySelectorAll('.result-item').forEach(function(el) { el.classList.remove('selected'); });
+        div.classList.add('selected');
+        drawGraph(idx);
+        showDetail(idx);
+      };
+      resultsDiv.appendChild(div);
+    });
+
+    // Zoom in a bit but don't break the cluster
+    e.layer.zoomToBounds({padding: [20, 20]});
+  });
+
   map.addLayer(clusterGroup);
 }
 
