@@ -221,9 +221,13 @@ fetch(CDN + '/graph_data.json')
 
 function initClusterMarkers() {
   clusterGroup = L.markerClusterGroup({
-    maxClusterRadius: 40,
+    maxClusterRadius: function(zoom) {
+      // At low zoom: normal clustering; at high zoom: only co-located POIs (shared entrance) cluster
+      if (zoom < 15) return 60;
+      if (zoom < 17) return 40;
+      return 3; // ~3px — only exact same entrance position clusters
+    },
     spiderfyOnMaxZoom: false,
-    disableClusteringAtZoom: 17,
     chunkedLoading: true,
   });
 
