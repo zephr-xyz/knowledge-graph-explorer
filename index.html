@@ -109,13 +109,11 @@
   .legend-circle { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
   .toggle-row {
-    display: flex; align-items: center; gap: 8px; margin-top: 6px;
-    padding-top: 6px; border-top: 1px solid #30363d; cursor: pointer;
-    user-select: none;
+    display: flex; align-items: center; gap: 8px; margin-top: 4px;
+    cursor: pointer; user-select: none;
   }
-  .toggle-row input[type="checkbox"] {
-    accent-color: #da3633; width: 13px; height: 13px; cursor: pointer;
-  }
+  .toggle-row:first-of-type { margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d; }
+  .toggle-row input[type="checkbox"] { width: 13px; height: 13px; cursor: pointer; }
   .toggle-row label { cursor: pointer; }
 
   .loading-overlay {
@@ -200,11 +198,16 @@
   <div class="legend-item"><div class="legend-circle" style="background:#56d364"></div> OSM node</div>
   <div class="legend-item"><div class="legend-circle" style="background:#bc8cff;opacity:0.5"></div> POI centroid</div>
   <div class="legend-item"><div class="legend-circle" style="background:#e3b341"></div> Co-tenant entrance</div>
-  <div class="toggle-row" onclick="document.getElementById('toggle-overture').click()">
+  <label class="toggle-row">
+    <input type="checkbox" id="toggle-pipeline" checked>
+    <div class="legend-circle" style="background:#58a6ff"></div>
+    Pipeline POIs
+  </label>
+  <label class="toggle-row">
     <input type="checkbox" id="toggle-overture">
     <div class="legend-circle" style="background:#da3633"></div>
-    <label for="toggle-overture">Raw Overture positions</label>
-  </div>
+    Raw Overture positions
+  </label>
 </div>
 
 <script>
@@ -615,29 +618,37 @@ searchInput.addEventListener('keydown', function(e) {
   }
 });
 
-// Raw Overture positions layer (unclustered red dots)
+// Layer toggles
 var overtureLayer = null;
 
-document.getElementById('toggle-overture').addEventListener('change', function(e) {
-  e.stopPropagation();
+document.getElementById('toggle-pipeline').addEventListener('change', function() {
+  if (!clusterGroup) return;
   if (this.checked) {
-    if (!overtureLayer) {
-      overtureLayer = L.layerGroup();
-      POIS.forEach(function(p) {
-        if (!p.la || !p.lo) return;
-        overtureLayer.addLayer(L.circleMarker([p.la, p.lo], {
-          radius: 2.5,
-          color: '#da3633',
-          fillColor: '#da3633',
-          fillOpacity: 0.7,
-          weight: 0,
-          interactive: false
-        }));
-      });
-    }
+    map.addLayer(clusterGroup);
+  } else {
+    map.removeLayer(clusterGroup);
+  }
+});
+
+document.getElementById('toggle-overture').addEventListener('change', function() {
+  if (!overtureLayer) {
+    overtureLayer = L.layerGroup();
+    POIS.forEach(function(p) {
+      if (!p.la || !p.lo) return;
+      overtureLayer.addLayer(L.circleMarker([p.la, p.lo], {
+        radius: 2.5,
+        color: '#da3633',
+        fillColor: '#da3633',
+        fillOpacity: 0.7,
+        weight: 0,
+        interactive: false
+      }));
+    });
+  }
+  if (this.checked) {
     map.addLayer(overtureLayer);
   } else {
-    if (overtureLayer) map.removeLayer(overtureLayer);
+    map.removeLayer(overtureLayer);
   }
 });
 </script>
